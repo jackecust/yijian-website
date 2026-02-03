@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 const Footer = () => {
+  // 从环境变量读取 API 地址，默认为本地开发地址
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -54,7 +57,7 @@ const Footer = () => {
     setSubmitStatus('idle');
 
     try {
-      const response = await fetch('http://10.12.10.5:3000/api/contact', {
+      const response = await fetch(`${API_BASE_URL}/api/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
