@@ -56,14 +56,57 @@ const Footer = () => {
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
+    // 增加超时时间和重试逻辑
+    const fetchWithTimeout = async (
+      url: string,
+      options: RequestInit,
+      timeout: number = 60000
+    ): Promise<Response> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+    };
+
+    // 重试函数
+    const fetchWithRetry = async (url: string, options: RequestInit, maxRetries: number = 2) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await fetchWithTimeout(url, options, 60000); // 60秒超时
+          return response;
+        } catch (error) {
+          console.warn(`提交失败，尝试 ${attempt}/${maxRetries}`, error);
+
+          // 最后一次尝试失败才抛出错误
+          if (attempt === maxRetries) {
+            throw error;
+          }
+
+          // 等待 2 秒后重试
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      throw new Error('Max retries exceeded');
+    };
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/contact`, {
+      const response = await fetchWithRetry(`${API_BASE_URL}/api/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
-      });
+      }, 2); // 最多重试 2 次
 
       const data = await response.json();
 
@@ -81,7 +124,7 @@ const Footer = () => {
       }
     } catch (error) {
       setSubmitStatus('error');
-      setErrorMessage('网络错误，请稍后重试');
+      setErrorMessage('服务器启动中，请稍后重试（首次访问需要 1-2 分钟）');
       console.error('提交失败:', error);
     } finally {
       setIsSubmitting(false);
